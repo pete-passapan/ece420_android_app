@@ -56,12 +56,27 @@ Java_com_example_ece420_1project_MainActivity_predictGender(
     std::vector<short> pcm(len);
     env->GetShortArrayRegion(audioData, 0, len, pcm.data());
 
+    float energy = 0.0f;
+    for (short sample : pcm)
+        energy += sample * sample;
+
+    energy /= len; // Average energy
+    const float SILENCE_THRESHOLD = 500.0f;  // Tune this!
+
+    if (energy < SILENCE_THRESHOLD) {
+        LOGD("Silence detected (energy = %f), skipping prediction.", energy);
+        return env->NewStringUTF("silence");
+    }
+
+
     auto mfcc = extractor.extract(pcm);
     if (mfcc.empty()) return env->NewStringUTF("unknown");
 
+    MFCC avg(NUM_MFCC, 0.0f);
+
     if (!mfcc.empty()) {
         // Average across frames
-        MFCC avg(NUM_MFCC, 0.0f);
+
         for (const auto& frame : mfcc) {
             for (int i = 0; i < NUM_MFCC; ++i) {
                 avg[i] += frame[i];

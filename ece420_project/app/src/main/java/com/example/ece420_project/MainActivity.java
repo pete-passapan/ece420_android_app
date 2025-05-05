@@ -8,7 +8,9 @@ import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -40,6 +42,9 @@ public class MainActivity extends AppCompatActivity {
     private static final int CHUNK_SIZE = SAMPLE_RATE;   // 1 sec
     private static final int HOP_SIZE = CHUNK_SIZE / 2;       // 50% overlap
 
+    private ProgressBar loadingProgressBar;
+    private TextView loadingTextView;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -49,7 +54,19 @@ public class MainActivity extends AppCompatActivity {
 
         Button recordButton = findViewById(R.id.recordButton);
 
-        loadTrainingDataFromAssets();
+        loadingProgressBar = findViewById(R.id.loadingProgressBar);
+        loadingTextView = findViewById(R.id.loadingTextView);
+
+// Show loading UI
+        loadingProgressBar.setVisibility(View.VISIBLE);
+        loadingTextView.setVisibility(View.VISIBLE);
+
+// Hide main interaction until loading completes
+        resultTextView.setVisibility(View.GONE);
+        recordButton.setEnabled(false);
+
+// Load data in a background thread
+        new Thread(this::loadTrainingDataFromAssets).start();
 
         recordButton.setOnClickListener(v -> toggleRecording());
         recordButton.setText("Start Live Prediction");
@@ -160,7 +177,13 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        Toast.makeText(this, "All training data are loaded.", Toast.LENGTH_SHORT).show();
+        runOnUiThread(() -> {
+            Toast.makeText(this, "All training data are loaded.", Toast.LENGTH_SHORT).show();
+            loadingProgressBar.setVisibility(View.GONE);
+            loadingTextView.setVisibility(View.GONE);
+            resultTextView.setVisibility(View.VISIBLE);
+            findViewById(R.id.recordButton).setEnabled(true);
+        });
     }
 
     private short[] loadWavFromAssets(String path) throws IOException {
