@@ -61,14 +61,13 @@ Java_com_example_ece420_1project_MainActivity_predictGender(
         energy += sample * sample;
 
     energy /= len; // Average energy
-    const float SILENCE_THRESHOLD = 500.0f;  // Tune this!
+    const float SILENCE_THRESHOLD = 1000000.0f;  // Tune this!
+
+    LOGD("Energy = %f", energy);
 
     if (energy < SILENCE_THRESHOLD) {
-        LOGD("Silence detected (energy = %f), skipping prediction.", energy);
-        return env->NewStringUTF("silence");
+        return env->NewStringUTF("...");
     }
-
-
     auto mfcc = extractor.extract(pcm);
     if (mfcc.empty()) return env->NewStringUTF("unknown");
 
@@ -86,7 +85,7 @@ Java_com_example_ece420_1project_MainActivity_predictGender(
             avg[i] /= mfcc.size();
     }
 
-    std::string result = recognizer.recognize(avg,10);
+    std::string result = recognizer.recognize(avg,5);
     LOGD("Predicted: %s", result.c_str());
     return env->NewStringUTF(result.c_str());
 }

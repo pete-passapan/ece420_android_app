@@ -21,6 +21,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.Queue;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -32,6 +34,8 @@ public class MainActivity extends AppCompatActivity {
     // Native functions
     public native void addTrainingExample(String label, short[] audio);
     public native String predictGender(short[] audio);
+    private static final int VOTE_WINDOW_SIZE = 10;
+    private final Queue<String> predictionHistory = new LinkedList<>();
 
     private TextView resultTextView;
     private AudioRecord recorder;
@@ -40,7 +44,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int SAMPLE_RATE = 16000;
     private static final int CHUNK_SIZE = SAMPLE_RATE;   // 1 sec
-    private static final int HOP_SIZE = CHUNK_SIZE / 2;       // 50% overlap
+    private static final int HOP_SIZE = CHUNK_SIZE / 10;       // 50% overlap
 
     private ProgressBar loadingProgressBar;
     private TextView loadingTextView;
@@ -134,9 +138,34 @@ public class MainActivity extends AppCompatActivity {
                         short[] window = new short[CHUNK_SIZE];
                         System.arraycopy(buffer, 0, window, 0, CHUNK_SIZE);
                         String result = predictGender(window);
-                        runOnUiThread(() -> resultTextView.setText("Prediction: " + result));
+                        synchronized (predictionHistory) {
+                            if (predictionHistory.size() >= VOTE_WINDOW_SIZE) {
+                                predictionHistory.poll();  // remove oldest
+                            }
+                            predictionHistory.offer(result);
 
-                        // Shift for 50% hop
+                            int maleCount = 0, femaleCount = 0;
+                            for (String pred : predictionHistory) {
+                                if (pred.equalsIgnoreCase("male")) {
+                                    maleCount++;
+                                } else if (pred.equalsIgnoreCase("female")) {
+                                    femaleCount++;
+                                }
+                            }
+
+                            String votedResult;
+                            if (maleCount > femaleCount) {
+                                votedResult = "male";
+                            } else if (femaleCount > maleCount) {
+                                votedResult = "female";
+                            } else {
+                                votedResult = "...";  // optional fallback
+                            }
+
+                            String finalVotedResult = votedResult;
+                            runOnUiThread(() -> resultTextView.setText("Prediction: " + finalVotedResult));
+                        }
+
                         System.arraycopy(buffer, HOP_SIZE, buffer, 0, CHUNK_SIZE - HOP_SIZE);
                         offset = CHUNK_SIZE - HOP_SIZE;
                     }
